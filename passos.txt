@@ -1,0 +1,159 @@
+1 - Criar componente covid19
+    ng g c covid19
+
+2 - Criar o diretorio reducer no covid19
+
+3 - Criar o arquivo covid19.state.ts
+
+4 - criar o arquivo covid19.actions.ts
+import { createAction } from '@ngrx/store';
+
+export const getCovid19 = createAction('[Covid19] getCovid19');
+export const getCovid19Success = createAction('[Covid19] getCovid19', (data) => ({data}));
+
+5 - Criar o arquivo covid19.reducer.ts
+
+    import { createReducer, on } from '@ngrx/store';
+    import { initialState } from './covid19.state';
+    import { getCovid19, getCovid19Success } from './covid19.actions';
+
+    const _covid19Reducer = createReducer(initialState, 
+        on(getCovid19, (state) => Object.assign({}, state, {loading: true})),
+        on(getCovid19Success,  (state, action) => Object.assign({}, state, {loading: true, data: action.data}))
+    );
+
+    export function covid19Reducer(state, action) {
+        return _covid19Reducer(state, action);
+    }
+
+6 - registrar reducer
+
+    import { environment } from '../environments/environment';
+    import { StoreModule } from '@ngrx/store';
+    import { covid19Reducer } from './covid19/reducer/covid19.reducer';
+
+    StoreModule.forRoot({ covid: covid19Reducer }),
+    StoreDevtoolsModule.instrument({
+        maxAge: 25,
+        logOnly: environment.production
+    })
+
+7 - dispachar as ações: 
+
+    import { Store } from '@ngrx/store';
+    private store: Store<Covid19State>
+
+8 - Criar servico
+
+    ng g s covid19/covid19
+    
+    no app Module
+        import { HttpClientModule } from '@angular/common/http';
+
+9 - Criar efeito colateral
+    
+    covid19.effect.ts
+
+    import { Injectable } from '@angular/core';
+    import { createEffect, Actions, ofType } from '@ngrx/effects';
+    import { getCovid19, getCovid19Success } from './covid19.actions';
+
+    import { mergeMap, map } from 'rxjs/operators';
+    import { Covid19Service } from '../covid19.service';
+
+
+    @Injectable()
+    export class Covid19Effect {
+
+        getCovid19Effect$ = createEffect(() => this.actions$.pipe(
+            ofType(getCovid19),
+            mergeMap(action => this.covid19Service.getCovid19()
+            .pipe(map(res => getCovid19Success(res))))));
+
+        constructor(private actions$: Actions, 
+            private covid19Service: Covid19Service) {
+        }
+
+    }
+
+10 - registar effect
+
+    import { EffectsModule } from '@ngrx/effects';
+
+
+    EffectsModule.forRoot([Covid19Effect])
+
+
+11 - instalar highcharts
+
+    import * as Highcharts from 'highcharts';
+    npm install highcharts
+
+12 - Criar seletor
+
+export const getCovid19Feature = createFeatureSelector<any>('covid');
+
+export const getCovid19Data = createSelector(
+    getCovid19Feature,
+    (state: any) => state.covid.data
+);
+
+
+12 - criar grafico
+
+  createChart() {
+
+    this.store.select(getCovid19Data)
+      .pipe(map(data => Object.keys(data)
+        .map(key => ({
+          name: key, data: data[key].map(value => {
+            let date = value.date.split('-');
+            return [Date.UTC(date[0], date[1], date[2]), value.confirmed ];
+          })
+        }))))
+      .subscribe((data: any) => {
+        if (data) {
+
+          Highcharts.chart('container', {
+            title: {
+              text: 'Covid 19'
+            },
+            subtitle: {
+              text: ''
+            },
+            yAxis: {
+              title: {
+                text: 'Número de pessoas confirmadas com Covid19'
+              }
+            },
+            xAxis: {
+              type: 'datetime',
+              labels: {
+                  format: '{value:%Y-%m-%d}',
+                  align: 'left'
+              }
+            },
+            legend: {
+              layout: 'vertical',
+              align: 'right',
+              verticalAlign: 'middle'
+            },
+            series: data.slice(0, 10),
+            responsive: {
+              rules: [{
+                condition: {
+                  maxWidth: 500
+                },
+                chartOptions: {
+                  legend: {
+                    layout: 'horizontal',
+                    align: 'center',
+                    verticalAlign: 'bottom'
+                  }
+                }
+              }]
+            }
+          });
+        }
+      });
+  }
